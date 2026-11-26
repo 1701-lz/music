@@ -1,1 +1,142 @@
-<h1>我的个人音乐网站建成啦！</h1>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的音乐播放器</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f7;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            padding-top: 50px;
+        }
+        .player-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 350px;
+        }
+        h2 {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .song-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .song-item:hover {
+            background-color: #f9f9f9;
+        }
+        .song-item.playing {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            font-weight: bold;
+        }
+        .song-name {
+            font-size: 14px;
+        }
+        .song-artist {
+            font-size: 12px;
+            color: #888;
+        }
+        audio {
+            width: 100%;
+            margin-top: 20px;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="player-container">
+    <h2>我的音乐列表</h2>
+    <div id="song-list">
+        <!-- 歌单会在这里生成 -->
+    </div>
+    <audio id="audio-player" controls></audio>
+</div>
+
+<script>
+    // 【注意】这里就是你的歌单数据
+    const songs = [
+        {
+            name: "黑色信封",
+            artist: "2004 被禁忌的游戏",
+            url: "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/01.黑色信封.mp3",
+            cover: "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/Cover.jpg"
+        },
+        {
+            name: "青春",
+            artist: "2004 被禁忌的游戏",
+            url: "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/02.青春.mp3",
+            cover: "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/Cover.jpg"
+        },
+        {
+            name: "阿兰",
+            artist: "2004 被禁忌的游戏",
+            url: "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/03.阿兰.mp3",
+            cover: "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/Cover.jpg"
+        }
+        // 你有几首歌，就在这里按格式加几首，记得用英文逗号隔开
+    ];
+
+    const audioPlayer = document.getElementById('audio-player');
+    const songList = document.getElementById('song-list');
+    let currentIndex = -1;
+
+    // 渲染歌单
+    function renderList() {
+        songList.innerHTML = '';
+        songs.forEach((song, index) => {
+            const div = document.createElement('div');
+            div.className = 'song-item';
+            div.innerHTML = `
+                <div>
+                    <div class="song-name">${song.name}</div>
+                    <div class="song-artist">${song.artist}</div>
+                </div>
+            `;
+            div.onclick = () => playSong(index);
+            songList.appendChild(div);
+        });
+    }
+
+    // 播放指定歌曲
+    function playSong(index) {
+        currentIndex = index;
+        const song = songs[index];
+        
+        // 更新UI高亮
+        const items = document.querySelectorAll('.song-item');
+        items.forEach((item, i) => {
+            if (i === index) item.classList.add('playing');
+            else item.classList.remove('playing');
+        });
+
+        // 设置音频源并播放
+        audioPlayer.src = song.url;
+        audioPlayer.play().catch(e => alert("播放失败，请检查链接或网络"));
+    }
+
+    // 自动播放下一首
+    audioPlayer.addEventListener('ended', () => {
+        if (currentIndex < songs.length - 1) {
+            playSong(currentIndex + 1);
+        }
+    });
+
+    // 初始化
+    renderList();
+</script>
+
+</body>
+</html>
