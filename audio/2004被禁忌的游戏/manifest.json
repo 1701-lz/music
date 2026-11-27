@@ -1,0 +1,21 @@
+{
+  "albums": [
+    {
+      "albumName": "2004 被禁忌的游戏",
+      "artist": "李志",
+      "year": 2004,
+      "cover": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/Cover.jpg",
+      "tracks": [
+        { "title": "黑色信封",     "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/01.黑色信封.mp3",     "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "青春",         "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/02.青春.mp3",         "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "阿兰",         "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/03.阿兰.mp3",         "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "离婚",         "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/04.离婚.mp3",         "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "欢愉",         "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/05.欢愉.mp3",         "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "卡夫卡",       "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/06.卡夫卡.mp3",       "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "被禁忌的游戏", "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/07.被禁忌的游戏.mp3", "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "罗庄的冬天",   "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/08.罗庄的冬天.mp3",   "duration": "--:--", "size": "—", "format": "MP3" },
+        { "title": "红色气球",     "file": "https://cdn.jsdelivr.net/gh/1701-lz/music@main/audio/2004被禁忌的游戏/09.红色气球.mp3",     "duration": "--:--", "size": "—", "format": "MP3" }
+      ]
+    }
+  ]
+}

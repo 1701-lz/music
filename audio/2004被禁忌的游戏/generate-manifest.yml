@@ -1,0 +1,36 @@
+# 放到仓库的 .github/workflows/generate-manifest.yml
+# 作用：每次 push 到 audio/ 时自动扫描目录、重建 manifest.json 并提交。
+# 这样「新增专辑文件夹 → 刷新网页就能看到」全程自动，且不需要任何 Token
+#（GITHUB_TOKEN 由 GitHub 自动注入，权限只在本仓库内、不会泄露到前端）。
+name: 自动生成音乐清单
+
+on:
+  push:
+    paths:
+      - 'audio/**'
+      - 'generate-list.js'
+  workflow_dispatch:        # 也允许在 Actions 面板手动点一次
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 扫描 audio/ 生成 manifest.json
+        run: node generate-list.js --out=manifest.json
+
+      - name: 提交清单
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git diff --quiet && git diff --staged --quiet || \
+            (git commit -m "chore: 自动更新音乐清单" && git push)
