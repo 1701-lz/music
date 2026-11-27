@@ -11,6 +11,24 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" /></noscript>
 
+<!-- ==========================================================================
+     高级功能依赖（唯一一个第三方库）
+     jsmediatags 3.9.7 —— 读取 MP3 内嵌 ID3v2 / ID3v1 标签
+       · 能读：title(TIT2) / artist(TPE1) / album(TALB) / year(TYER) / 封面(APIC)
+       · 不能读：精确时长（用 <audio> 的 loadedmetadata）、SYLT 同步歌词
+                 （逐行滚动请放同名 .lrc）
+       · 用 defer 不阻塞首屏；CDN 不可达时 readID3() 直接返回 null，
+         自动降级「文件名推断」，不白屏、不报错、不影响播放。
+     --------------------------------------------------------------------------
+     备用 CDN（jsDelivr 不可达时换成其中任意一条即可）：
+       https://unpkg.com/jsmediatags@3.9.7/dist/jsmediatags.min.js
+       https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.7/jsmediatags.min.js
+     --------------------------------------------------------------------------
+     LRC 解析、滚动定位、播放模式、new Audio() URL/CORS 处理全部手写，
+     在 advanced-player.js 里，不引入其它库。
+     ========================================================================== -->
+<script defer src="https://cdn.jsdelivr.net/npm/jsmediatags@3.9.7/dist/jsmediatags.min.js"></script>
+
 <style>
 /* ==========================================================================
    01 / 设计令牌 Design Tokens
@@ -223,7 +241,7 @@ ul{margin:0;padding:0;list-style:none}
 .is-collapsed .brand-name,
 .is-collapsed .nav-item span,
 .is-collapsed .section-label span,
-.is-collapsed .playlist-item span,
+.is-collapsed .playlist-item span:not(.pl-thumb),
 .is-collapsed .collapse-btn span{opacity:0;pointer-events:none;transition:opacity var(--t-fast) ease}
 .is-collapsed .brand{justify-content:center;padding:0}
 .is-collapsed .nav-item,.is-collapsed .playlist-item,.is-collapsed .collapse-btn{justify-content:center;padding-left:0;padding-right:0}
@@ -850,6 +868,46 @@ ul{margin:0;padding:0;list-style:none}
   *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
   .album-card,.artist-card,.detail-hero,.track-table,.fs-inner,.queue{opacity:1 !important;transform:none !important}
 }
+
+/* ==========================================================================
+   10 / 数据接入扩展：真实封面 / 侧栏专辑导航 / 数据源状态
+   ========================================================================== */
+/* 真实封面：图片盖在 CSS 生成的封面之上；图片 404 时 onerror 移除自身，
+   底下 18 种 CSS 封面 + 渐变自动接管，永远不会出现破图。 */
+.cv__img{position:absolute;inset:0;z-index:1;display:block;width:100%;height:100%;object-fit:cover}
+.cv--photo .cv__kicker,.cv--photo .cv__title,.cv--photo .cv__foot,.cv--photo .cv__extra{display:none}
+
+/* 侧栏：专辑缩略图 + 选中态 + 空态 */
+.pl-thumb{overflow:hidden;background-size:cover;background-position:center}
+.pl-thumb img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.playlist-item.is-active{background:var(--bg-active);color:var(--text-1);font-weight:600}
+.playlist-item.is-active .pl-thumb{box-shadow:0 0 0 1px var(--accent)}
+.nav-empty{padding:10px 11px;color:var(--text-3);font-size:var(--fs-xs)}
+.nav-count{font-style:normal;opacity:.65;margin-left:3px;font-family:var(--font-display)}
+
+/* 侧栏底部数据源标识 */
+.source-chip{
+  display:flex;align-items:center;gap:7px;flex:none;
+  margin:var(--s2) 6px 2px;padding:7px 9px;
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--text-3);font-size:10px;letter-spacing:.04em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  cursor:default;transition:color var(--t-fast) ease,border-color var(--t-fast) ease;
+}
+.src-dot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--text-3);box-shadow:0 0 0 3px rgba(127,127,127,.14)}
+.source-chip[data-source=github] .src-dot{background:#3fb950;box-shadow:0 0 0 3px rgba(63,185,80,.16)}
+.source-chip[data-source=static] .src-dot{background:#d29922;box-shadow:0 0 0 3px rgba(210,153,34,.16)}
+.source-chip[data-source=demo]   .src-dot{background:#6e7681;box-shadow:0 0 0 3px rgba(110,118,129,.16)}
+.source-chip.is-loading{color:var(--accent);border-color:var(--accent)}
+.source-chip.is-loading .src-dot{background:var(--accent);animation:srcPulse 1s ease-in-out infinite}
+@keyframes srcPulse{50%{opacity:.25;transform:scale(.7)}}
+.is-collapsed .source-chip{display:none}
+.section-label .ic{width:13px;height:13px}
+.section-label button.is-spin .ic{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 全屏页「暂无歌词」占位 */
+.lyric-hint{opacity:.45;font-size:14px !important;font-weight:400 !important}
 </style>
 </head>
 
@@ -885,6 +943,8 @@ ul{margin:0;padding:0;list-style:none}
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-empty" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.5 18a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.6 1.4A3.8 3.8 0 0 1 17.5 18h-11Z"/></symbol>
 </svg>
 
 <div class="app" id="app">
@@ -906,13 +966,14 @@ ul{margin:0;padding:0;list-style:none}
 
     <div class="playlist-section">
       <div class="section-label">
-        <span>歌单</span>
-        <button data-action="add-playlist" title="新建歌单" aria-label="新建歌单">+</button>
+        <span>专辑 <em class="nav-count" id="albumNavCount"></em></span>
+        <button id="refreshBtn" data-action="refresh-library" title="重新同步曲库" aria-label="重新同步曲库"><svg class="ic"><use href="#i-refresh"/></svg></button>
       </div>
-      <ul id="playlistList">
-        <li><button class="playlist-item" data-action="play-playlist" title="李志"><span class="pl-thumb"></span><span>李志</span></button></li>
-      </ul>
+      <!-- 由 renderAlbumNav() 从真实曲库动态渲染，无静态条目 -->
+      <ul id="playlistList"></ul>
     </div>
+
+    <div class="source-chip" id="sourceChip" data-source="loading" title="当前曲库数据源"></div>
 
     <button class="collapse-btn" id="collapseBtn" data-action="toggle-sidebar" title="收起侧边栏">
       <svg class="ic"><use href="#i-chevron-up"/></svg><span>收起</span>
@@ -938,7 +999,8 @@ ul{margin:0;padding:0;list-style:none}
 
   <!-- ============================== 中间内容区 ============================== -->
   <main class="main" id="main" tabindex="-1">
-    <div id="viewRoot"></div>
+    <!-- 内容区只有一个空容器；专辑卡片由 renderAlbums() 从真实数据动态创建 -->
+    <div id="viewRoot"><div id="album-list" class="album-grid"></div></div>
   </main>
 
   <!-- ============================ 底部播放控制栏 ============================ -->
@@ -1027,173 +1089,26 @@ ul{margin:0;padding:0;list-style:none}
   </aside>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- 真实音频元素：数据源提供 file 字段时由它播放，否则走内置演示计时器 -->
+  <audio id="audioEl" preload="metadata"></audio>
 </div>
+
+<!-- 数据层：清单文件（list.js / manifest.json）由 fetch 读取，绝不写死在 HTML 里 -->
+<script src="data-source.js"></script>
+<!-- 高级播放层：ID3 / LRC / 播放模式 -->
+<script src="advanced-player.js"></script>
 
 <script>
 /* ==========================================================================
-   10 / Mock Data（假数据）
-   —— 所有内容集中在这里，替换成后端接口时只需改动这一层。
-   —— cover 用纯 CSS 配方生成，不依赖任何外部图片。
+   10 / 曲库容器 —— 本文件里没有任何假专辑 / 假曲目 / 假歌词
+   HTML 里只有一个空容器 #album-list，所有卡片由
+   MusicDataSource.renderAlbums() 从真实数据动态创建。
    ========================================================================== */
-const MOCK = (() => {
-  /* 封面配方：skin 决定排版，c1/c2 决定主色，ink 决定文字色 */
-  const C = (skin, c1, c2, ink, kicker, title, foot, extra) =>
-    ({ skin, c1, c2, ink, kicker, title, foot, extra });
-
-  /* 前 18 张对照截图逐张配置 */
-  const featured = [
-    { id:'a01', title:'2025李志·叁缺壹巡演西宁站', artist:'李志', year:2025, count:26,
-      cover:C('blue','#2a5fa8','#0a1730','#eaf3ff','李志','叁缺壹','2025 LIVE IN XINING') },
-    { id:'a02', title:'2026 叁缺壹巡演吉隆坡站', artist:'李志', year:2026, count:23,
-      cover:C('sea','#8fb9cf','#0a2438','#ffffff','','叁缺壹','KUALA LUMPUR 2026') },
-    { id:'a03', title:'2025叁缺壹巡演吉隆坡站', artist:'李志', year:2025, count:9,
-      cover:C('red','#ff4436','#140507','#ffffff','李志','叁缺壹','2025 KUALA LUMPUR') },
-    { id:'a04', title:'THREE MISSING ONE JAPAN Tour 2024 in Tokyo', artist:'李志', year:2024, count:14,
-      cover:C('mono','#050505','#111111','#ffffff','Live Recording Album','李志','THREE MISSING ONE','#/JAPAN TOUR 2024 in Tokyo') },
-    { id:'a05', title:'叁缺壹', artist:'李志', year:2016, count:8,
-      cover:C('white','#f2f0ea','#dedbd2','#171717','李志','缺','SUN QUE YI') },
-    { id:'a06', title:'洗心革面', artist:'李志', year:2019, count:22,
-      cover:C('paper','#e8dfc8','#cfc3a6','#a5241c','李志','洗心革面','2018—2019') },
-    { id:'a07', title:'台北早上好', artist:'李志', year:2019, count:19,
-      cover:C('olive','#a49d80','#3c3a30','#e9e5d4','','台北','TAIPEI GOOD MORNING') },
-    { id:'a08', title:'李志*"洗心革面"2018-2019 跨年', artist:'Muma木马', year:2019, count:9,
-      cover:C('dark','#3a3538','#171517','#e04a3c','洗心革面','李志','MUMA / 2019') },
-    { id:'a09', title:'香港早上好', artist:'李志', year:2019, count:8,
-      cover:C('ink','#efece5','#d8d4ca','#111111','李志','香港','HONG KONG, CHINA · GOOD MORNING') },
-    { id:'a10', title:'爵士乐与不插电新编12首', artist:'李志', year:2018, count:12,
-      cover:C('orange','#e2a25b','#6d3c22','#fff2e2','李志','12','JAZZ & UNPLUGGED') },
-    { id:'a11', title:'李志·电声与管弦乐II', artist:'李志', year:2017, count:9,
-      cover:C('charcoal','#3a383a','#0b0b0c','#ffffff','','李志','ELECTRIC & ORCHESTRA II') },
-    { id:'a12', title:'金城兰州', artist:'李志', year:2016, count:1,
-      cover:C('cream','#f4f0e2','#cdd8b8','#2f3a24','','金城兰州','LANZHOU') },
-    { id:'a13', title:'草莓音乐节', artist:'李志', year:2015, count:7,
-      cover:C('pink','#f6548f','#e7356f','#ffffff','MUSIC FESTIVAL','103','STRAWBERRY 2015') },
-    { id:'a14', title:'动静', artist:'李志', year:2014, count:12,
-      cover:C('night','#1b2a4a','#122038','#ff6a5c','李志','动静','LIVE 2014') },
-    { id:'a15', title:'a Simple Day', artist:'李志', year:2014, count:8,
-      cover:C('simple','#fbfbf8','#eef1e9','#4a5b4a','','a Simple Day','LI ZHI / 2014') },
-    { id:'a16', title:'S', artist:'李志', year:2013, count:9,
-      cover:C('scarlet','#e0231d','#b81b16','#111111','','S','LI ZHI') },
-    { id:'a17', title:'每一条伤心的应天大街上', artist:'李志', year:2012, count:8,
-      cover:C('urban','#3b4d8f','#141833','#ff5f52','李志','应天大街','NANJING 2012') },
-    { id:'a18', title:'禁动音乐会', artist:'李志', year:2011, count:11,
-      cover:C('purple','#8e3fa8','#241033','#ffe9a8','LI ZHI','禁动','LIVE 2011') },
-  ];
-
-  /* 补齐到 47 张：作品名池 + 皮肤池循环，保证每张封面观感不同 */
-  const extraTitles = [
-    '1701','这个世界会好吗','我爱南京','你好，郑州','F','天空之城','关于郑州的记忆',
-    '米店','山阴路的夏天','定西','热河','和你在一起','红色气球','梵高先生',
-    '被禁忌的游戏','黑色信封','春末的南方城市','你离开了南京，从此没有人和我说话',
-    '这个世界会好吗 2024 Live','工体东路没有人','在每一条伤心的应天大街上',
-    '1701 十周年现场','我爱南京 2023 Live','叁缺壹 欧洲巡演','蓝色骨头','一头偶像的黄昏',
-    '南京 南京','不插电现场','雨中的南京'
-  ];
-  const skins = ['blue','sea','red','mono','white','paper','olive','dark','ink','orange','charcoal','cream','pink','night','simple','scarlet','urban','purple'];
-  const palettes = [
-    ['#2f5f9e','#0b1a33'],['#8fb9cf','#0a2438'],['#e04a3c','#210809'],['#101010','#050505'],
-    ['#f0ede5','#d9d5ca'],['#e8dfc8','#c6b99c'],['#9c9679','#3b392e'],['#403a3e','#161416'],
-    ['#e9b45c','#6d3c22'],['#e0231d','#a81813'],['#3b4d8f','#141833'],['#8e3fa8','#241033']
-  ];
-  const extra = extraTitles.map((t,i) => {
-    const p = palettes[i % palettes.length];
-    return {
-      id:'a' + String(19 + i).padStart(2,'0'),
-      title:t,
-      artist:i % 7 === 3 ? 'Muma木马' : (i % 9 === 5 ? '声音碎片' : '李志'),
-      year:2009 + (i % 17),
-      count:[9,10,12,8,11,14,7,13,10,9,12,8,11,14,9,10,12][i % 17],
-      cover:C(skins[i % skins.length],p[0],p[1],'#ffffff','李志',t.length > 6 ? t.slice(0,4) : t,'LI ZHI / ' + (2009 + (i % 17)))
-    };
-  });
-  const albums = [...featured, ...extra];
-
-  /* a04 详情页曲目：对照第三张截图，含日文曲名 / 时长 / 大小 / 格式 */
-  const tokyoTracks = [
-    ['郑州の記憶 + 魚草魚 + 晩春の南方都市', 909, '103 MB'],
-    ['青い空',                              317, '34.7 MB'],
-    ['倒影',                                298, '27.0 MB'],
-    ['黒い対億',                            323, '32.2 MB'],
-    ['君と',                                278, '32.8 MB'],
-    ['天空の城',                            229, '27.1 MB'],
-    ['ダチョウ・裸のヒマワリ・ネズミが滝る',1446,'159 MB'],
-    ['この世界に未来はあるの?',              317, '33.1 MB'],
-    ['ゴッホ',                              318, '34.1 MB'],
-    ['禁じられた遊び + _frames + ああ疲',    762, '137 MB'],
-    ['山陰路の夏',                          382, '42.0 MB'],
-    ['米店',                                284, '31.5 MB'],
-    ['和你在一起',                          336, '36.8 MB'],
-    ['关于郑州的记忆',                      352, '38.2 MB'],
-  ];
-
-  /* 其余专辑的通用曲目池，保证任意卡片点进去都有完整列表 */
-  const genericTitles = [
-    '山陰路の夏','关于郑州的记忆','天空之城','米店','和你在一起','定西','热河','梵高先生',
-    '这个世界会好吗','我爱南京','红色气球','黑色信封','被禁忌的游戏','春末的南方城市',
-    '你离开了南京，从此没有人和我说话','在每一条伤心的应天大街上','一头偶像的黄昏','1701',
-    'F','动静','金城兰州','草莓音乐节','a Simple Day','洗心革面','叁缺壹','蓝色骨头','工体东路没有人'
-  ];
-
-  const tracklists = {};
-  albums.forEach(al => {
-    const src = al.id === 'a04' ? tokyoTracks : null;
-    tracklists[al.id] = Array.from({length:al.count}, (_,i) => {
-      const base = src && src[i] ? src[i] : null;
-      const title = base ? base[0] : genericTitles[(i + al.id.charCodeAt(2)) % genericTitles.length];
-      const sec  = base ? base[1] : 178 + ((i * 37 + al.id.charCodeAt(1) * 11) % 340);
-      const size = base ? base[2] : (18 + ((i * 7 + al.count) % 90)) + '.' + ((i * 3) % 10) + ' MB';
-      return {
-        id: al.id + '-t' + (i+1),
-        no: i+1,
-        title,
-        artist: al.artist,
-        album: al.title,
-        sec,
-        duration: fmt(sec),
-        size,
-        format: i % 17 === 16 ? 'MP3' : 'FLAC',
-        liked: (al.id === 'a04' && (i === 2 || i === 5)) || (i % 13 === 4),
-        albumId: al.id,
-        cover: al.cover
-      };
-    });
-  });
-
-  function fmt(s){
-    s = Math.max(0, Math.floor(s));
-    return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
-  }
-
-  /* 三套时间轴歌词，切换歌曲时轮换；第一套对应截图中的《山陰路の夏》 */
-  const lyricSets = [
-    [
-      [0,'（前奏）'],[24,'我多么想和你走在我身边的样子'],[52,'想起来的爱就不能停止'],
-      [80,'南京的雨不停地下不停地下'],[108,'有些人却注定要相遇'],
-      [140,'你是一片光荣的叶子落在我卑贱的心'],[175,'像往常一样我为自己生气并且歌唱'],
-      [205,'那么乏力 爱也吹不动的叶子'],[238,'我多么想和你走在我身边的样子'],
-      [262,'想起来的爱就不能停止'],[286,'南京的雨不停地下不停地下'],
-      [310,'有些人却注定要相遇'],[334,'你是一片光荣的叶子落在我卑贱的心'],
-      [356,'像往常一样我为自己生气并且歌唱'],[378,'那么乏力 爱也吹不动的叶子']
-    ],
-    [
-      [0,'（前奏）'],[18,'关于郑州我想的全是你'],[42,'想来生活无非是痛苦和美丽'],
-      [66,'雾气穿过她年轻的脖子'],[90,'直到今日我才肯相信'],
-      [116,'我多么想和你走在我身边的样子'],[142,'关于郑州的记忆'],
-      [168,'每次想起你 我都会想起那场雨'],[196,'时间改变不了什么'],
-      [224,'只改变了我们看它的方式'],[252,'（间奏）'],[278,'关于郑州我想的全是你'],
-      [308,'想来生活无非是痛苦和美丽'],[340,'（尾奏）']
-    ],
-    [
-      [0,'（前奏）'],[20,'港岛的夜里没有星星'],[44,'我把名字写进风里'],
-      [68,'谁在唱着旧日的歌'],[94,'谁又把灯一盏盏熄灭'],
-      [120,'你是一片光荣的叶子'],[148,'落在我卑贱的心'],
-      [176,'像往常一样我为自己生气并且歌唱'],[206,'那么乏力 爱也吹不动的叶子'],
-      [238,'（间奏）'],[266,'港岛的夜里没有星星'],[296,'我把名字写进风里'],[330,'（尾奏）']
-    ]
-  ];
-
-  return { albums, tracklists, lyricSets, fmt };
-})();
+function fmt(s){
+  s = Math.max(0, Math.floor(Number(s) || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
 
 /* ==========================================================================
    11 / 状态 & 工具函数
@@ -1209,8 +1124,8 @@ const state = {
   albumId:null,
   queue:[],                 // 当前播放队列（track 数组）
   track:null,
-  playing:true,             // 默认处于播放态，对应截图中的暂停按钮
-  progress:165,             // 起始 2:45 / 6:22，对应全屏页截图进度
+  playing:false,            // 真实曲库：不自动播放
+  progress:0,
   volume:72,
   muted:false,
   mode:'loop',              // loop | shuffle | single
@@ -1223,35 +1138,130 @@ const state = {
   queueOpen:false,
   theme:localStorage.getItem('fn-theme') || 'dark',
   collapsed:false,
+  lyricSet:null,            // 由 .lrc 解析出的时间轴歌词，优先级最高（[[秒,文本],...]）
+  lyricOffset:0,            // LRC [offset:±毫秒] 换算成秒
+  lyricMeta:null,           // [ti:][ar:][al:] 等歌词元数据
+  embeddedLyrics:null,      // MP3 内嵌 USLT（无时间轴，整段展示）
 };
 
-/* 从 Mock Data 初始化收藏状态与默认播放队列 */
-MOCK.albums.forEach(a => MOCK.tracklists[a.id].forEach(t => { if (t.liked) state.liked.add(t.id); }));
-state.queue = MOCK.tracklists.a04;
-state.track = state.queue[10];   // 默认《山陰路の夏》，与截图一致
+/* ---------------------------------------------------------------------------
+   当前生效的曲库 LIB —— 所有渲染函数只读它。
+   初始为空；bootLibrary() 拿到真实数据后由 applyLibrary() 整体替换。
+   --------------------------------------------------------------------------- */
+let LIB = { albums:[], tracklists:{}, lyricSets:[], fmt, source:'loading' };
+let LIB_SOURCE = 'loading';
+let LIB_ERROR = null;        // 加载失败时保存排查信息，供空状态展示
+let usingRealAudio = false;          // true = 由 <audio> 驱动进度；false = 演示计时器
+let lyricToken = 0, id3Token = 0, lastQueueRef = null;
+const audioEl = $('#audioEl');
+
+/* 高级播放层：以纯函数方式接入现有 UI（保留原有 state / render，不推翻） */
+const AP = window.AdvancedPlayer;
+const shuffleBag = new AP.ShuffleBag(0);
+
+/* 资源 URL 已在 data-source.js 的 resolveAsset() 里统一处理（含中文编码）。
+   这里一律传 local，让 AP.resolveAudioURL 原样透传，避免二次拼接导致乱码。 */
+function audioHostOpts(){
+  const c = (window.MusicDataSource && window.MusicDataSource.CONFIG) || {};
+  return { owner:c.owner, repo:c.repo, branch:c.branch || 'main', host:'local' };
+}
+
+/* ID3 回填：异步、不阻塞起播；CDN 不可用 / 无标签时用文件名兜底 */
+async function applyID3(track, url){
+  if(!url) return;
+  const token = ++id3Token;
+  const tags = await AP.readID3(url);
+  if(token !== id3Token || state.track !== track) return;   // 已切歌，丢弃过期结果
+  if(!tags){
+    const fb = AP.fallbackFromFilename(url);
+    if(!track.title) track.title = fb.title;
+    if(!track.artist || track.artist === '未知歌手') track.artist = fb.artist;
+    if(!track.album) track.album = fb.album;
+  } else {
+    if(tags.title)  track.title  = tags.title;
+    if(tags.artist) track.artist = tags.artist;
+    if(tags.album)  track.album  = tags.album;
+    if(tags.picture && track.cover) track.cover = Object.assign({}, track.cover, { url:tags.picture });
+    if(tags.lyrics && !track.lrc){
+      track.embeddedLyrics = tags.lyrics;
+      state.embeddedLyrics = String(tags.lyrics).split(/\r?\n/).filter(Boolean);
+    }
+  }
+  renderPlayer();
+  renderFullscreen();
+  if(state.queueOpen) renderQueue();
+  if(state.view === 'detail') renderView();
+  if(state.fullscreen) renderLyrics(true);
+}
+
+function seedStateFromLibrary(){
+  state.liked = new Set();
+  LIB.albums.forEach(a => (LIB.tracklists[a.id] || []).forEach(t => { if (t.liked) state.liked.add(t.id); }));
+  const first = LIB.albums[0];
+  state.queue = first ? (LIB.tracklists[first.id] || []).slice() : [];
+  state.track = state.queue[0] || null;   // 真实曲库：首张专辑第一首，不自动播放
+  state.progress = 0;
+  state.playing = false;
+}
+seedStateFromLibrary();
 
 let timer = null, toastTimer = null;
 
+/* cover 既接受原来的 CSS 配方对象，也接受真实图片 URL（或 {url:'...'}）。
+   图片加载失败时 onerror 移除自己，底层 CSS 封面无缝接管。 */
 function coverHTML(cv, extraClass = ''){
   if(!cv) return '';
+  if(typeof cv === 'string') cv = { url:cv, skin:'blue', c1:'#2a5fa8', c2:'#0a1730', ink:'#ffffff' };
   const style = `--c1:${cv.c1};--c2:${cv.c2};--ink:${cv.ink}`;
-  return `<div class="cv cv--${cv.skin} ${extraClass}" style="${style}">
-    <div class="cv__art"></div>
-    ${cv.kicker ? `<span class="cv__kicker">${esc(cv.kicker)}</span>` : ''}
-    <span class="cv__title">${esc(cv.title)}</span>
-    ${cv.foot ? `<span class="cv__foot">${esc(cv.foot)}</span>` : ''}
-    ${cv.extra ? `<span class="cv__extra">${esc(cv.extra)}</span>` : ''}
+  const img = cv.url
+    ? `<img class="cv__img" src="${esc(cv.url)}" alt="" loading="lazy" onerror="this.remove()">`
+    : '';
+  const text = cv.url ? '' : [
+    cv.kicker ? `<span class="cv__kicker">${esc(cv.kicker)}</span>` : '',
+    `<span class="cv__title">${esc(cv.title || '')}</span>`,
+    cv.foot  ? `<span class="cv__foot">${esc(cv.foot)}</span>` : '',
+    cv.extra ? `<span class="cv__extra">${esc(cv.extra)}</span>` : '',
+  ].join('');
+  return `<div class="cv cv--${cv.skin || 'blue'} ${cv.url ? 'cv--photo' : ''} ${extraClass}" style="${style}">
+    <div class="cv__art"></div>${img}${text}
   </div>`;
 }
 
-function albumById(id){ return MOCK.albums.find(a => a.id === id); }
+function albumById(id){ return LIB.albums.find(a => a.id === id); }
+
+/* ---------------------------------------------------------------------------
+   滚动歌词 —— 解析与定位交给 advanced-player.js 的 parseLRC / activeIndex
+   支持 [ti:][ar:][al:][offset:]、一行多时间戳、增强型逐字标签、二分查找。
+   数据源可提供同名 .lrc（GitHub 自动模式按 01.mp3 ↔ 01.lrc 配对）。
+   --------------------------------------------------------------------------- */
+async function loadLyricsFor(t){
+  const token = ++lyricToken;
+  state.lyricSet = null;
+  state.lyricOffset = 0;
+  state.lyricMeta = null;
+  state.embeddedLyrics = null;
+  if(!t) return;
+  const parsed = await AP.loadLRC(t.lrc);      // 跨域失败安静返回 null
+  if(token !== lyricToken) return;            // 已切歌，丢弃过期结果
+  if(parsed){
+    state.lyricSet = parsed.toPairs();
+    state.lyricOffset = parsed.offset;
+    state.lyricMeta = parsed.meta;
+  } else if(t.embeddedLyrics){
+    /* MP3 内嵌 USLT 无时间轴：整段展示，不伪造逐行时间 */
+    state.embeddedLyrics = String(t.embeddedLyrics).split(/\r?\n/).filter(Boolean);
+  }
+  if(state.fullscreen) renderLyrics(true);
+}
+
+const NO_LYRICS = [[0, '♪ 暂无歌词'], [0, '在专辑目录放置同名 .lrc 即可显示']];
+const EMBED_HINT = [0, '♪ MP3 内嵌歌词（无时间轴）'];
 function currentLyricSet(){
-  if(!state.track) return MOCK.lyricSets[0];
-  /* 《山陰路の夏》固定用第一套歌词，保证与截图高亮句一致；其余按曲名稳定散列 */
-  if(state.track.title.includes('山陰路')) return MOCK.lyricSets[0];
-  let h = 0;
-  for(const ch of state.track.title) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return MOCK.lyricSets[h % MOCK.lyricSets.length];
+  if(!state.track) return NO_LYRICS;
+  if(state.lyricSet && state.lyricSet.length) return state.lyricSet;
+  if(state.embeddedLyrics && state.embeddedLyrics.length)
+    return [EMBED_HINT, ...state.embeddedLyrics.map(line => [0, line])];
+  return NO_LYRICS;                           // 没有 .lrc 时显示占位，绝不用演示歌词
 }
 function toast(msg){
   const el = $('#toast');
@@ -1262,28 +1272,52 @@ function toast(msg){
 }
 
 /* ==========================================================================
-   12 / 渲染：主内容区
+   12 / 渲染：主内容区 —— 以下三个入口全部由 LIB 驱动
+       ① renderAlbumNav()  左侧专辑列表
+       ② albumCardHTML()   中间专辑网格卡片
+       ③ detailHTML()      专辑详情页歌曲表格
    ========================================================================== */
+
+/* ① 左侧专辑列表：完全由当前数据源动态生成 */
+function renderAlbumNav(){
+  const ul = $('#playlistList');
+  if(!ul) return;
+  const count = $('#albumNavCount');
+  if(count) count.textContent = '· ' + LIB.albums.length;
+  if(!LIB.albums.length){ ul.innerHTML = '<li class="nav-empty">暂无专辑</li>'; return; }
+  ul.innerHTML = LIB.albums.map(a => {
+    const cv = a.cover || {};
+    const bg = `background:linear-gradient(140deg,${cv.c1 || '#4d7fd6'},${cv.c2 || '#22304f'})`;
+    const thumb = cv.url ? `<img src="${esc(cv.url)}" alt="" onerror="this.remove()">` : '';
+    const active = (state.view === 'detail' && state.albumId === a.id) ? 'is-active' : '';
+    return `<li><button class="playlist-item ${active}" data-action="open-album" data-id="${esc(a.id)}" title="${esc(a.title)}">
+      <span class="pl-thumb" style="${bg}">${thumb}</span><span>${esc(a.title)}</span></button></li>`;
+  }).join('');
+}
+
+/* 数据源状态标识 */
+function updateSourceChip(source, detail, loading){
+  const chip = $('#sourceChip');
+  if(!chip) return;
+  const map = { loading:['···','正在同步'], list:['LIST','清单文件'], github:['GITHUB','GitHub REST API'], empty:['EMPTY','未读到曲库'] };
+  const [tag, name] = map[source] || map.empty;
+  chip.dataset.source = source;
+  chip.classList.toggle('is-loading', !!loading);
+  chip.innerHTML = `<span class="src-dot"></span>${loading ? '正在同步曲库…' : tag + ' · ' + esc(name)}`;
+  chip.title = '当前曲库：' + name + '\n' + (detail || '') + '\n点侧栏 ↻ 可重新同步';
+}
+
 function filteredAlbums(){
-  let list = MOCK.albums.slice();
+  let list = LIB.albums.slice();
   const q = state.search.trim().toLowerCase();
-  if(q) list = list.filter(a => (a.title + a.artist).toLowerCase().includes(q));
-  if(state.sort === 'name')  list.sort((a,b) => a.title.localeCompare(b.title,'zh-CN'));
+  if(q) list = list.filter(a => ((a.title || '') + (a.artist || '')).toLowerCase().includes(q));
+  if(state.sort === 'name')  list.sort((a,b) => String(a.title).localeCompare(String(b.title),'zh-CN'));
   if(state.sort === 'count') list.sort((a,b) => b.count - a.count);
   return list;
 }
 
-function albumCardHTML(a, i){
-  return `<article class="album-card" data-action="open-album" data-id="${a.id}" style="--i:${i}" tabindex="0" role="button" aria-label="打开专辑 ${esc(a.title)}">
-    <div class="cover-wrap">
-      ${coverHTML(a.cover)}
-      <span class="card-badge num">${a.count}</span>
-      <button class="card-play" data-action="play-album" data-id="${a.id}" title="播放 ${esc(a.title)}" aria-label="播放专辑 ${esc(a.title)}">${icon('play')}</button>
-    </div>
-    <div class="card-title">${esc(a.title)}</div>
-    <div class="card-artist">${esc(a.artist)}</div>
-  </article>`;
-}
+/* 专辑卡片由 MusicDataSource.renderAlbums() 用 document.createElement 动态创建，
+   本文件不再生成任何专辑 HTML。 */
 
 function emptyHTML(title, desc){
   return `<div class="empty">${icon('empty')}<h3>${esc(title)}</h3><p>${esc(desc)}</p>
@@ -1294,10 +1328,15 @@ function renderView(){
   const root = $('#viewRoot');
   const back = $('#backBtn');
   back.hidden = state.view !== 'detail';
+  if(!LIB.albums.length && state.view !== 'detail'){
+    if(LIB_SOURCE === 'loading') window.MusicDataSource.renderLoading(root);
+    else window.MusicDataSource.renderEmpty(root, LIB_ERROR);
+    return;
+  }
 
   if(state.view === 'detail'){ root.innerHTML = detailHTML(); bindDetail(); return; }
 
-  const titles = { albums:['专辑','共 ' + MOCK.albums.length + ' 张专辑'],
+  const titles = { albums:['专辑','共 ' + LIB.albums.length + ' 张专辑'],
                    favorites:['收藏','你收藏的专辑'],
                    recent:['最近','最近播放过的专辑'],
                    artists:['歌手','按歌手浏览'] };
@@ -1305,9 +1344,10 @@ function renderView(){
   const sortLabel = state.sort === 'name' ? '按名称' : state.sort === 'count' ? '按歌曲数' : '默认排序';
 
   let body = '';
+  let gridList = null;
   if(state.view === 'artists'){
     const map = new Map();
-    MOCK.albums.forEach(a => map.set(a.artist, (map.get(a.artist) || 0) + 1));
+    LIB.albums.forEach(a => map.set(a.artist, (map.get(a.artist) || 0) + 1));
     const colors = [['#4d7fd6','#22304f'],['#c2604f','#5a241c'],['#5c8d6a','#243b2c'],['#8a6bb0','#3a2a52']];
     body = `<div class="artist-grid">${Array.from(map.entries()).map(([name,n],i) => `
       <div class="artist-card" data-action="filter-artist" data-name="${esc(name)}" style="--i:${i}" tabindex="0" role="button">
@@ -1317,10 +1357,11 @@ function renderView(){
       </div>`).join('')}</div>`;
   } else {
     let list = filteredAlbums();
-    if(state.view === 'favorites') list = list.filter(a => MOCK.tracklists[a.id].some(t => state.liked.has(t.id)));
+    gridList = list;
+    if(state.view === 'favorites') list = list.filter(a => (LIB.tracklists[a.id] || []).some(t => state.liked.has(t.id)));
     if(state.view === 'recent')   list = state.recent.map(albumById).filter(Boolean);
     body = list.length
-      ? `<div class="album-grid">${list.map((a,i) => albumCardHTML(a,i)).join('')}</div>`
+      ? '<div id="album-list" class="album-grid"></div>'   /* 空容器，由 renderAlbums() 填充 */
       : emptyHTML(state.search ? '没有找到相关专辑' : (state.view === 'favorites' ? '还没有收藏' : '还没有播放记录'),
                   state.search ? `换个关键词试试，或清空搜索框。` : '点开一张专辑，播放或点一下红心，这里就会有内容。');
   }
@@ -1333,6 +1374,11 @@ function renderView(){
       </div>
     </div>${body}`;
 
+  /* 真实数据 → 动态创建专辑卡片（document.createElement） */
+  if(gridList && gridList.length){
+    window.MusicDataSource.renderAlbums(gridList, $('#album-list'));
+  }
+
   /* 网格卡片的键盘可达：Enter / Space 打开详情 */
   $$('.album-card, .artist-card', root).forEach(el => el.addEventListener('keydown', e => {
     if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); el.click(); }
@@ -1342,22 +1388,24 @@ function renderView(){
 function detailHTML(){
   const a = albumById(state.albumId);
   if(!a) return emptyHTML('专辑不存在','返回专辑列表重新选择。');
-  const tracks = MOCK.tracklists[a.id];
+  const tracks = LIB.tracklists[a.id] || [];
+  const metaLine = [a.artist, a.year ? a.year + ' 年发行' : '', a.count + ' 首歌'].filter(Boolean).join(' · ');
   return `
     <section class="detail-hero">
       <div class="detail-cover">${coverHTML(a.cover)}</div>
       <div class="detail-info">
         <p class="detail-eyebrow">专辑</p>
         <h1 class="detail-title">${esc(a.title)}</h1>
-        <p class="detail-meta">${esc(a.artist)} · ${a.year} 年发行 · ${a.count} 首歌</p>
+        <p class="detail-meta">${esc(metaLine)}</p>
         <div class="detail-actions">
-          <button class="primary-btn" data-action="play-album" data-id="${a.id}">${icon('play')}播放全部</button>
-          <button class="icon-pill" data-action="shuffle-album" data-id="${a.id}" title="随机播放" aria-label="随机播放">${icon('shuffle')}</button>
+          <button class="primary-btn" data-action="play-album" data-id="${esc(a.id)}">${icon('play')}播放全部</button>
+          <button class="icon-pill" data-action="shuffle-album" data-id="${esc(a.id)}" title="随机播放" aria-label="随机播放">${icon('shuffle')}</button>
           <button class="icon-pill" data-action="download" title="下载" aria-label="下载">${icon('download')}</button>
           <button class="icon-pill" data-action="more" title="更多" aria-label="更多">${icon('more')}</button>
         </div>
       </div>
     </section>
+    ${tracks.length ? `
     <section class="track-table" aria-label="歌曲列表">
       <div class="track-row is-head">
         <span class="track-no">#</span><span>歌曲</span><span class="col-album">专辑</span>
@@ -1365,7 +1413,7 @@ function detailHTML(){
         <span class="t-right col-size">大小</span><span class="t-right col-format">格式</span>
       </div>
       ${tracks.map(t => trackRowHTML(t)).join('')}
-    </section>`;
+    </section>` : emptyHTML('这张专辑还没有歌曲','在 GitHub 仓库的该专辑文件夹里放入音频文件后刷新即可。')}`;
 }
 
 function trackRowHTML(t){
@@ -1425,13 +1473,14 @@ function renderPlayer(){
 
   $('#fsFormat').textContent = t.format;
   $('#fsDur').textContent = t.duration;
-  $('#seekRange').max = t.sec;
+  $('#seekRange').max = Math.max(1, t.sec || 1);
 }
 
 function renderFullscreen(){
   const t = state.track;
   if(!t) return;
-  $('#fsBg').style.background = `linear-gradient(135deg,${t.cover.c1},${t.cover.c2})`;
+  const cv = t.cover || { c1:'#2a2430', c2:'#141118' };
+  $('#fsBg').style.background = `linear-gradient(135deg,${cv.c1 || '#2a2430'},${cv.c2 || '#141118'})`;
   $('#fsCover').innerHTML = coverHTML(t.cover);
   $('#fsTitle').textContent = t.title;
   $('#fsSub').textContent = `${t.artist} · ${t.album}`;
@@ -1442,12 +1491,18 @@ function renderLyrics(force = false){
   const box = $('#lyrics');
   if(!box) return;
   const set = currentLyricSet();
-  if(force || box.dataset.key !== String(state.track.id)){
-    box.dataset.key = String(state.track.id);
-    box.innerHTML = set.map(([,text],i) => `<div class="lyric-line" data-i="${i}">${esc(text)}</div>`).join('');
+  const key = String(state.track && state.track.id) + '|' + (state.lyricSet ? 'lrc' : '') + '|' + set.length;
+  if(force || box.dataset.key !== key){
+    box.dataset.key = key;
+    box.innerHTML = set.map(([,text],i) =>
+      `<div class="lyric-line ${set === NO_LYRICS && i > 0 ? 'lyric-hint' : ''}" data-i="${i}">${esc(text)}</div>`
+    ).join('');
   }
-  let idx = 0;
-  for(let i = 0; i < set.length; i++){ if(state.progress >= set[i][0]) idx = i; }
+  /* 二分定位当前行；LRC 的 [offset:] 在这里生效。
+     占位文案 / 内嵌 USLT 没有时间轴，固定高亮首行，避免二分落到灰色提示行上。 */
+  const offset = state.lyricSet ? (state.lyricOffset || 0) : 0;
+  const isStaticLyrics = set === NO_LYRICS || set[0] === EMBED_HINT;
+  const idx = isStaticLyrics ? 0 : Math.max(0, AP.activeIndex(set, state.progress, offset));
   $$('.lyric-line', box).forEach((el,i) => el.classList.toggle('is-active', i === idx));
   const lineH = window.innerWidth <= 860 ? 44 : 56;
   const viewport = $('.fs-right').clientHeight || 480;
@@ -1467,11 +1522,12 @@ function renderQueue(){
 function renderProgress(){
   const t = state.track;
   if(!t) return;
-  const pct = Math.min(100, state.progress / t.sec * 100);
+  const dur = t.sec || 1;
+  const pct = Math.min(100, state.progress / dur * 100);
   $('#playerProgressFill').style.width = pct + '%';
-  $('#fsCur').textContent = MOCK.fmt(state.progress);
+  $('#fsCur').textContent = LIB.fmt(state.progress);
   const seek = $('#seekRange');
-  if(document.activeElement !== seek) seek.value = state.progress;
+  if(document.activeElement !== seek) seek.value = Math.min(state.progress, dur);
 }
 
 /* ==========================================================================
@@ -1480,24 +1536,61 @@ function renderProgress(){
 function playAlbum(id, shuffle = false){
   const a = albumById(id);
   if(!a) return;
-  let list = MOCK.tracklists[id].slice();
-  if(shuffle) list.sort(() => Math.random() - .5);
+  let list = (LIB.tracklists[id] || []).slice();
+  if(!list.length){ toast('这张专辑还没有歌曲'); return; }
+  if(shuffle){
+    const bag = new AP.ShuffleBag(list.length);
+    list = Array.from({ length:list.length }, () => list[bag.next(-1)]);
+  }
   state.queue = list;
   playTrack(list[0], true);
   state.recent = [id, ...state.recent.filter(x => x !== id)].slice(0, 8);
   toast(shuffle ? `随机播放《${a.title}》` : `正在播放《${a.title}》`);
   if(state.view !== 'detail') renderView();
+  renderAlbumNav();
 }
 
 function playTrack(track, autoplay = true){
+  if(!track) return;
   state.track = track;
   state.progress = 0;
   state.playing = autoplay;
+  usingRealAudio = !!track.file;
+  /* 队列变了才重置洗牌桶，保证「一轮内不重复」不被切歌打断 */
+  if(lastQueueRef !== state.queue){
+    lastQueueRef = state.queue;
+    shuffleBag.setSize(state.queue.length);
+    shuffleBag.reset();
+  }
+  const playURL = usingRealAudio ? AP.resolveAudioURL(track.file, audioHostOpts()) : '';
+
+  if(usingRealAudio){
+    /* 真实音频：进度交给 <audio> 的 timeupdate，时长由 loadedmetadata 回填 */
+    audioEl.pause();
+    audioEl.src = playURL;              // ← new Audio() / audio.src 的播放 URL
+    audioEl.volume = state.muted ? 0 : state.volume / 100;
+    audioEl.load();
+    if(autoplay){
+      audioEl.play().catch(() => {
+        state.playing = false;
+        renderPlayer();
+        toast('浏览器阻止了自动播放，点一下播放按钮即可');
+      });
+    }
+  } else {
+    /* 该曲目没有真实音频地址时：只推进进度条计时，不产生任何假歌曲 */
+    audioEl.pause();
+    audioEl.removeAttribute('src');
+  }
+
+  loadLyricsFor(track);
+  applyID3(track, playURL);             // 异步补 ID3，不阻塞起播
   renderPlayer();
   renderFullscreen();
   renderProgress();
   if(state.queueOpen) renderQueue();
   if(state.view === 'detail') renderView();
+  renderAlbumNav();
   startTimer();
 }
 
@@ -1505,9 +1598,16 @@ function startTimer(){
   clearInterval(timer);
   /* 演示用 4 倍速推进，便于在合理时间内看到歌词滚动与进度变化 */
   timer = setInterval(() => {
-    if(!state.playing || !state.track) return;
+    if(!state.track) return;
+    if(usingRealAudio){
+      /* 真实音频的 state.progress 由 timeupdate 写入，这里只刷新歌词高亮 */
+      if(state.fullscreen) renderLyrics();
+      return;
+    }
+    if(!state.playing) return;
     state.progress += 1;
-    if(state.progress >= state.track.sec){
+    const dur = state.track.sec || 240;
+    if(state.progress >= dur){
       if(state.mode === 'single'){ state.progress = 0; }
       else { nextTrack(true); return; }
     }
@@ -1517,37 +1617,58 @@ function startTimer(){
 }
 
 function nextTrack(auto = false){
-  if(!state.queue.length) return;
-  let i = state.queue.findIndex(t => t.id === state.track.id);
-  if(state.mode === 'shuffle' && state.queue.length > 1){
-    let j = i;
-    while(j === i) j = Math.floor(Math.random() * state.queue.length);
-    i = j;
-  } else {
-    i = (i + 1) % state.queue.length;
+  if(!state.queue.length || !state.track) return;
+  const cur = state.queue.findIndex(t => t.id === state.track.id);
+  shuffleBag.setSize(state.queue.length);
+  /* manual=true（用户点下一首）时，单曲循环也要切歌；自动播完则原地重播 */
+  const r = AP.computeNextIndex(state.queue.length, cur, state.mode, shuffleBag, !auto);
+  if(r.index < 0) return;
+  if(r.replay){
+    state.progress = 0;
+    if(usingRealAudio){ audioEl.currentTime = 0; audioEl.play().catch(() => {}); }
+    renderProgress();
+    if(state.fullscreen) renderLyrics(true);
+    return;
   }
-  playTrack(state.queue[i], state.playing || auto);
+  playTrack(state.queue[r.index], state.playing || auto);
 }
 
 function prevTrack(){
   if(!state.queue.length) return;
-  if(state.progress > 5){ state.progress = 0; renderProgress(); return; }
+  if(state.progress > 5){
+    state.progress = 0;
+    if(usingRealAudio) audioEl.currentTime = 0;
+    renderProgress();
+    return;
+  }
   let i = state.queue.findIndex(t => t.id === state.track.id);
   i = (i - 1 + state.queue.length) % state.queue.length;
   playTrack(state.queue[i], state.playing);
 }
 
 function togglePlay(){
-  state.playing = !state.playing;
+  if(usingRealAudio){
+    if(audioEl.paused){
+      audioEl.play().catch(() => toast('音频尚未就绪，稍候再试'));
+      state.playing = true;
+    } else {
+      audioEl.pause();
+      state.playing = false;
+    }
+  } else {
+    state.playing = !state.playing;
+  }
   $('#mainPlayBtn').innerHTML = icon(state.playing ? 'pause' : 'play');
   $('#fsPlayBtn').innerHTML   = icon(state.playing ? 'pause' : 'play');
 }
 
 function cycleMode(){
-  const order = ['loop','shuffle','single'];
-  state.mode = order[(order.indexOf(state.mode) + 1) % 3];
+  const order = AP.MODES;              // loop → shuffle → single
+  state.mode = order[(order.indexOf(state.mode) + 1) % order.length];
+  shuffleBag.setSize(state.queue.length);
+  shuffleBag.reset();
   renderPlayer();
-  toast({loop:'列表循环',shuffle:'随机播放',single:'单曲循环'}[state.mode]);
+  toast(AP.MODE_LABEL[state.mode]);
 }
 
 function toggleLike(id){
@@ -1563,6 +1684,7 @@ function setVolume(v){
   state.volume = Number(v);
   state.muted = state.volume === 0;
   $('#volumeRange').value = state.volume;
+  audioEl.volume = state.muted ? 0 : state.volume / 100;
   $('#muteBtn').innerHTML = icon(state.muted ? 'mute' : 'volume');
   $('#fsMuteBtn').innerHTML = icon(state.muted ? 'mute' : 'volume');
 }
@@ -1608,15 +1730,16 @@ document.addEventListener('click', (e) => {
   switch(action){
     case 'open-album':
       state.albumId = id; state.view = 'detail';
-      renderView(); $('#main').scrollTop = 0;
+      renderView(); renderAlbumNav(); $('#main').scrollTop = 0;
       break;
     case 'play-album':      playAlbum(id); break;
     case 'shuffle-album':   playAlbum(id, true); break;
     case 'play-track': {
-      const t = MOCK.tracklists[el.dataset.album].find(x => x.id === id);
+      const list = LIB.tracklists[el.dataset.album] || [];
+      const t = list.find(x => x.id === id);
       const al = albumById(el.dataset.album);
-      if(t){ state.queue = MOCK.tracklists[el.dataset.album].slice(); playTrack(t, true);
-             state.recent = [al.id, ...state.recent.filter(x => x !== al.id)].slice(0,8); }
+      if(t){ state.queue = list.slice(); playTrack(t, true);
+             if(al) state.recent = [al.id, ...state.recent.filter(x => x !== al.id)].slice(0,8); }
       break;
     }
     case 'toggle-like-track': toggleLike(id); break;
@@ -1663,9 +1786,18 @@ document.addEventListener('click', (e) => {
       state.search = el.dataset.name; $('#searchInput').value = el.dataset.name;
       setNav('albums');
       break;
-    case 'play-playlist':   playAlbum('a04'); break;
-    case 'add-playlist':    toast('新建歌单（演示）'); break;
-    case 'download':        toast('已加入下载队列（演示）'); break;
+    case 'play-playlist': {
+      const first = LIB.albums[0];
+      if(first) playAlbum(first.id);
+      break;
+    }
+    case 'refresh-library': bootLibrary(true); break;
+    case 'download':
+      if(state.track && state.track.file){
+        window.open(state.track.file, '_blank', 'noopener');
+        toast('已在新标签打开音频文件');
+      } else toast('已加入下载队列（演示）');
+      break;
     case 'more':            toast('更多操作（演示）'); break;
     case 'user':            toast('你好，d'); break;
   }
@@ -1688,18 +1820,43 @@ $('#searchInput').addEventListener('input', (e) => {
 function seekFromEvent(e, el){
   const r = el.getBoundingClientRect();
   const p = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-  state.progress = p * state.track.sec;
+  const dur = usingRealAudio && isFinite(audioEl.duration) ? audioEl.duration : (state.track.sec || 1);
+  state.progress = p * dur;
+  if(usingRealAudio) audioEl.currentTime = state.progress;
   renderProgress();
   if(state.fullscreen) renderLyrics();
 }
 $('#playerProgress').addEventListener('click', (e) => seekFromEvent(e, e.currentTarget));
 $('#seekRange').addEventListener('input', (e) => {
   state.progress = Number(e.target.value);
-  $('#fsCur').textContent = MOCK.fmt(state.progress);
-  $('#playerProgressFill').style.width = (state.progress / state.track.sec * 100) + '%';
+  if(usingRealAudio) audioEl.currentTime = state.progress;
+  $('#fsCur').textContent = LIB.fmt(state.progress);
+  $('#playerProgressFill').style.width = (state.progress / (state.track.sec || 1) * 100) + '%';
   if(state.fullscreen) renderLyrics();
 });
 $('#volumeRange').addEventListener('input', (e) => setVolume(e.target.value));
+
+/* 真实音频事件：进度 / 时长回填 / 切歌 / 出错提示 */
+audioEl.addEventListener('timeupdate', () => {
+  if(!usingRealAudio || !state.track) return;
+  state.progress = audioEl.currentTime || 0;
+  renderProgress();
+  if(state.fullscreen) renderLyrics();
+});
+audioEl.addEventListener('loadedmetadata', () => {
+  if(!usingRealAudio || !state.track || !isFinite(audioEl.duration) || audioEl.duration <= 0) return;
+  const t = state.track;
+  t.sec = Math.floor(audioEl.duration);
+  t.duration = LIB.fmt(t.sec);
+  $('#fsDur').textContent = t.duration;
+  $('#seekRange').max = t.sec;
+  renderProgress();
+  if(state.view === 'detail') renderView();   // 详情表里的时长同步刷新
+});
+audioEl.addEventListener('ended', () => { if(usingRealAudio) nextTrack(true); });
+audioEl.addEventListener('error', () => {
+  if(usingRealAudio) toast('音频加载失败，请检查 file 路径 / 仓库是否公开 / 文件格式');
+});
 
 /* 键盘快捷键 */
 document.addEventListener('keydown', (e) => {
@@ -1713,36 +1870,132 @@ document.addEventListener('keydown', (e) => {
   if(typing) return;
   if(e.key === ' '){ e.preventDefault(); togglePlay(); }
   if(e.key === '/'){ e.preventDefault(); $('#searchInput').focus(); }
-  if(e.key === 'ArrowRight'){ state.progress = Math.min(state.track.sec, state.progress + 5); renderProgress(); if(state.fullscreen) renderLyrics(); }
-  if(e.key === 'ArrowLeft'){ state.progress = Math.max(0, state.progress - 5); renderProgress(); if(state.fullscreen) renderLyrics(); }
+  if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
+    const d = e.key === 'ArrowRight' ? 5 : -5;
+    const dur = usingRealAudio && isFinite(audioEl.duration) ? audioEl.duration : (state.track.sec || 1);
+    state.progress = Math.min(dur, Math.max(0, state.progress + d));
+    if(usingRealAudio) audioEl.currentTime = state.progress;
+    renderProgress();
+    if(state.fullscreen) renderLyrics();
+  }
 });
 
 window.addEventListener('resize', () => { if(state.fullscreen) renderLyrics(true); });
 
 /* ==========================================================================
-   16 / 初始化
+   16 / 数据接入 & 初始化
+   --------------------------------------------------------------------------
+   策略：首屏只放空容器 → 异步读取真实曲库（清单文件 → GitHub API）→
+        成功后由 renderAlbums() 动态渲染；失败显示配置指引空状态。
+        全程没有任何内置假专辑，也不会静默回退到演示数据。
    ========================================================================== */
+
+/* 用真实曲库整体替换 LIB，重绘侧栏 / 网格 / 详情 / 播放栏 / 全屏页 */
+function applyLibrary(internal, source, meta){
+  LIB = {
+    albums: internal.albums,
+    tracklists: internal.tracklists,
+    lyricSets: [],
+    fmt,
+    source,
+  };
+  LIB_ERROR = null;
+  LIB_SOURCE = source;
+  seedStateFromLibrary();
+
+  state.search = ''; $('#searchInput').value = '';
+  state.albumId = null;
+  state.recent = [];
+  state.lyricSet = null;
+  state.lyricOffset = 0;
+  state.lyricMeta = null;
+  state.embeddedLyrics = null;
+  id3Token++; lyricToken++;            // 让在途的 ID3 / LRC 请求结果失效
+  state.view = 'albums'; state.nav = 'albums';
+  $$('.nav-item').forEach(b => b.classList.toggle('is-active', b.dataset.nav === 'albums'));
+  usingRealAudio = false;
+  audioEl.pause();
+  audioEl.removeAttribute('src');
+  clearInterval(timer);
+
+  if(!state.track){
+    $('#playerTitle').textContent = '暂无歌曲';
+    $('#playerArtist').textContent = LIB.albums.length + ' 张专辑';
+    $('#playerCover').innerHTML = '';
+  }
+
+  renderAlbumNav();
+  renderView();
+  renderPlayer();
+  renderFullscreen();
+  renderProgress();
+  renderQueue();
+  updateSourceChip(source, meta.reason || '');
+  initFromURL();
+  startTimer();
+  toast(`曲库已同步 · ${LIB.albums.length} 张专辑 · ${source === 'github' ? 'GitHub API' : '清单文件'}${meta.fromCache ? '（缓存）' : ''}`);
+}
+
+/* 异步加载入口：永不 reject；失败显示明确的排查指引，绝不回退假数据 */
+async function bootLibrary(force){
+  const DS = window.MusicDataSource;
+  const btn = $('#refreshBtn');
+  if(!DS) return;
+  updateSourceChip(LIB_SOURCE, '', true);
+  if(btn) btn.classList.add('is-spin');
+  try{
+    if(force) DS.clearCache();
+    const r = await DS.load({ force: !!force });
+    if(r.ok && r.internal && r.internal.albums.length){
+      applyLibrary(r.internal, r.source, r);
+    } else {
+      LIB_ERROR = r;
+      LIB_SOURCE = 'empty';
+      updateSourceChip('empty', r.reason || '');
+      renderView();
+      if(force) toast('同步未成功：' + (r.reason || '未知原因'));
+    }
+  }catch(err){
+    LIB_ERROR = { reason:String(err && err.message || err), reasons:[] };
+    LIB_SOURCE = 'empty';
+    updateSourceChip('empty', LIB_ERROR.reason);
+    renderView();
+    if(force) toast('同步出错：' + LIB_ERROR.reason);
+  }finally{
+    if(btn) btn.classList.remove('is-spin');
+  }
+}
+
+/* 首屏：只显示空容器 + 加载提示，绝不渲染任何假专辑 */
 setTheme(state.theme);
-renderView();
+renderAlbumNav();
+updateSourceChip('loading', '正在读取真实曲库');
+window.MusicDataSource.renderLoading($('#viewRoot'));
 renderPlayer();
 renderFullscreen();
 renderProgress();
+renderQueue();
 startTimer();
 
-/* 预览入口：可用 ?view=detail&album=a04 / ?view=fullscreen / ?view=artists 直达指定界面 */
-(function initFromURL(){
+/* 预览入口：?view=detail / ?view=fullscreen / ?view=artists
+   另可叠加 ?source=github | list、?list=manifest.json、?refresh=1 */
+function initFromURL(){
   const p = new URLSearchParams(location.search);
   const v = p.get('view');
   if(v === 'detail'){
-    state.albumId = p.get('album') || 'a04';
+    const want = p.get('album');
+    state.albumId = (want && albumById(want)) ? want : (LIB.albums[0] && LIB.albums[0].id);
     state.view = 'detail';
-    renderView();
+    renderView(); renderAlbumNav();
   } else if(v === 'fullscreen'){
     openFullscreen(true);
   } else if(['favorites','recent','artists'].includes(v)){
     setNav(v);
   }
-})();
+}
+initFromURL();
+
+bootLibrary(false);
 </script>
 </body>
 </html>
