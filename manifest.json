@@ -1,0 +1,148 @@
+{
+  "albums": [
+    {
+      "albumName": "被禁忌的游戏",
+      "artist": "李志",
+      "year": "",
+      "folder": "被禁忌的游戏",
+      "cover": "audio/被禁忌的游戏/Cover.jpg",
+      "tracks": [
+        {
+          "title": "黑色信封",
+          "file": "audio/被禁忌的游戏/01.黑色信封.mp3",
+          "duration": "--:--",
+          "size": "11.2 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "青春",
+          "file": "audio/被禁忌的游戏/02.青春.mp3",
+          "duration": "--:--",
+          "size": "7.5 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "阿兰",
+          "file": "audio/被禁忌的游戏/03.阿兰.mp3",
+          "duration": "--:--",
+          "size": "6.5 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "离婚",
+          "file": "audio/被禁忌的游戏/04.离婚.mp3",
+          "duration": "--:--",
+          "size": "11.5 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "欢愉",
+          "file": "audio/被禁忌的游戏/05.欢愉.mp3",
+          "duration": "--:--",
+          "size": "8.1 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "卡夫卡",
+          "file": "audio/被禁忌的游戏/06.卡夫卡.mp3",
+          "duration": "--:--",
+          "size": "6.9 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "被禁忌的游戏",
+          "file": "audio/被禁忌的游戏/07.被禁忌的游戏.mp3",
+          "duration": "--:--",
+          "size": "14.6 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "罗庄的冬天",
+          "file": "audio/被禁忌的游戏/08.罗庄的冬天.mp3",
+          "duration": "--:--",
+          "size": "15.9 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "红色气球",
+          "file": "audio/被禁忌的游戏/09.红色气球.mp3",
+          "duration": "--:--",
+          "size": "6.8 MB",
+          "format": "MP3"
+        }
+      ]
+    },
+    {
+      "albumName": "梵高先生",
+      "artist": "李志",
+      "year": "",
+      "folder": "梵高先生",
+      "cover": "audio/梵高先生/Cover.jpg",
+      "tracks": [
+        {
+          "title": "你离开了南京,从此没有人和我说话",
+          "file": "audio/梵高先生/01.你离开了南京,从此没有人和我说话.mp3",
+          "duration": "--:--",
+          "size": "2.8 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "董卓瑶",
+          "file": "audio/梵高先生/02.董卓瑶.mp3",
+          "duration": "--:--",
+          "size": "7.6 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "春末的南方城市",
+          "file": "audio/梵高先生/03.春末的南方城市.mp3",
+          "duration": "--:--",
+          "size": "9.4 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "来了",
+          "file": "audio/梵高先生/04.来了.mp3",
+          "duration": "--:--",
+          "size": "11.9 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "广场",
+          "file": "audio/梵高先生/05.广场.mp3",
+          "duration": "--:--",
+          "size": "9.6 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "曖昧",
+          "file": "audio/梵高先生/06.曖昧.mp3",
+          "duration": "--:--",
+          "size": "8.3 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "想起了他",
+          "file": "audio/梵高先生/07.想起了他.mp3",
+          "duration": "--:--",
+          "size": "10.5 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "梵高先生",
+          "file": "audio/梵高先生/08.梵高先生.mp3",
+          "duration": "--:--",
+          "size": "9.6 MB",
+          "format": "MP3"
+        },
+        {
+          "title": "斜",
+          "file": "audio/梵高先生/09.斜.mp3",
+          "duration": "--:--",
+          "size": "8.3 MB",
+          "format": "MP3"
+        }
+      ]
+    }
+  ]
+}
